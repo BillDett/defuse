@@ -1,85 +1,111 @@
 /*
  * Defuse the Bomb!
  * 
- * "Cut" the correctly colored wires in sequence to stop the bomb from detonating!
+ * "Cut" the specific colored wires in the correct sequence to stop the bomb from detonating!
  * 
- * Each wire is handled like a pushbutton & we have a simple state machine to watch
- * the progress.
+ * Cutting a wire outside the sequence speeds up the clock.
+ * 
+ * If a wire within the sequence is cut out of order, the bomb will go off.
+ * 
+ * If each wire in the sequence is cut in the correct order, the bomb is defused.
+ * 
+ * If the time expires before the sequence is completed correctly, the bomb will go off.
+ *
+ *TODO:
+ * Game logic to check the sequence
+ * Timing logic & clock display
  * 
  */
 #include <ButtonDebounce.h>
 #include <LiquidCrystal_I2C.h>
 
-ButtonDebounce blue_wire(2, 250);
-ButtonDebounce red_wire(3, 250);
-ButtonDebounce green_wire(4, 250);
-ButtonDebounce brown_wire(5, 250);
-ButtonDebounce yellow_wire(6, 250);
-ButtonDebounce orange_wire(7, 250);
-ButtonDebounce purple_wire(8, 250);
+// "Wire" Pins
+#define BLUE    2
+#define RED     3
+#define GREEN   4
+#define BROWN   5
+#define YELLOW  6
+#define ORANGE  7
+#define PURPLE  8
 
+ButtonDebounce blue_wire(BLUE, 250);
+ButtonDebounce red_wire(RED, 250);
+ButtonDebounce green_wire(GREEN, 250);
+ButtonDebounce brown_wire(BROWN, 250);
+ButtonDebounce yellow_wire(YELLOW, 250);
+ButtonDebounce orange_wire(ORANGE, 250);
+ButtonDebounce purple_wire(PURPLE, 250);
+
+// LCD Stuff
 LiquidCrystal_I2C lcd(0x27, 20, 4);   // SDA -> A4, SCL -> A5
 const char* blank = "                    ";
 
-void show_pulled_wire(char* color) {
+// Puzzle
+const int sequence[] = { ORANGE, BLUE, YELLOW };    // This is the correct removal sequence to defuse the bomb
+const int num_wires = 3;
+int next_to_cut = 0;                              // Which wire in the sequence should be cut next?
+
+void show_cut_wire(char* color) {
   lcd.setCursor(1, 5);
+  lcd.print(blank);
+  lcd.setCursor(1, 5);  
   lcd.print(color);
-  lcd.print(" was pulled!");
+  lcd.print(" was cut!");
 }
 
-void blue_pulled(const int state) {
+void blue_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Blue");
+    show_cut_wire("Blue");
   }
 }
 
-void red_pulled(const int state) {
+void red_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Red");  }
+    show_cut_wire("Red");  }
 }
 
-void green_pulled(const int state) {
+void green_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Green");
+    show_cut_wire("Green");
   }
 }
 
-void brown_pulled(const int state) {
+void brown_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Brown");
+    show_cut_wire("Brown");
   }
 }
 
-void yellow_pulled(const int state) {
+void yellow_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Yellow");
+    show_cut_wire("Yellow");
   }
 }
 
-void orange_pulled(const int state) {
+void orange_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Orange");
+    show_cut_wire("Orange");
   }
 }
 
-void purple_pulled(const int state) {
+void purple_cut(const int state) {
   if (state == LOW) {
-    show_pulled_wire("Purple");
+    show_cut_wire("Purple");
   }
 }
 
 
 void setup() { 
-  for (int p=2; p < 9; p++) {
+  for (int p=2; p < 9; p++) {   // DEPENDS ON "WIRE" PINS BEING SEQUENTIALLY DEFINED ABOVE!
     pinMode(p, INPUT);
   }
-  blue_wire.setCallback(blue_pulled);
-  red_wire.setCallback(red_pulled);
-  green_wire.setCallback(green_pulled);
-  brown_wire.setCallback(brown_pulled);
-  yellow_wire.setCallback(yellow_pulled);
-  orange_wire.setCallback(orange_pulled);
-  purple_wire.setCallback(purple_pulled);      
+  blue_wire.setCallback(blue_cut);
+  red_wire.setCallback(red_cut);
+  green_wire.setCallback(green_cut);
+  brown_wire.setCallback(brown_cut);
+  yellow_wire.setCallback(yellow_cut);
+  orange_wire.setCallback(orange_cut);
+  purple_wire.setCallback(purple_cut);      
 
   lcd.init();
   lcd.backlight();
