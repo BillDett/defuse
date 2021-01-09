@@ -18,6 +18,8 @@
  */
 #include <ButtonDebounce.h>
 #include <LiquidCrystal_I2C.h>
+#include <Adafruit_GFX.h>
+#include "Adafruit_LEDBackpack.h"
 
 // "Wire" Pins
 #define BLUE    2
@@ -38,7 +40,14 @@ ButtonDebounce purple_wire(PURPLE, 250);
 
 // LCD Stuff
 LiquidCrystal_I2C lcd(0x27, 20, 4);   // SDA -> A4, SCL -> A5
-const char* blank = "                    ";
+const char* blank = "                 ";
+
+Adafruit_7segment matrix = Adafruit_7segment();
+
+// Timer
+//const int duration = 3000;    // ms
+int remaining = 10000;
+int start_ms;
 
 // Puzzle
 const int sequence[] = { ORANGE, BLUE, YELLOW };    // This is the correct removal sequence to defuse the bomb
@@ -94,6 +103,20 @@ void purple_cut(const int state) {
   }
 }
 
+void check_time() {
+  if (remaining > 0) {
+    int elapsed = millis() - start_ms;
+    remaining -= elapsed;
+    //lcd.setCursor(2,2);
+    //lcd.print(remaining);
+    matrix.print(remaining/1000);
+    matrix.writeDisplay();
+    if ( remaining <= 0 ) {
+      lcd.print("  BOOM!"); 
+    }
+  }
+}
+
 
 void setup() { 
   for (int p=2; p < 9; p++) {   // DEPENDS ON "WIRE" PINS BEING SEQUENTIALLY DEFINED ABOVE!
@@ -111,6 +134,10 @@ void setup() {
   lcd.backlight();
   lcd.setCursor(0,0);
   lcd.print("Welcome To The Bomb!");
+
+  matrix.begin(0x70);
+
+  start_ms = millis();
 }
 
 void loop() {
@@ -121,4 +148,6 @@ void loop() {
   yellow_wire.update();
   orange_wire.update();
   purple_wire.update();
+  check_time();
+  delay(1000); // THIS IS BAD DESIGN...USE INTERRUPTS FOR TIMER?
 }
