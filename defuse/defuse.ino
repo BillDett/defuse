@@ -11,15 +11,13 @@
  * 
  * If the time expires before the sequence is completed correctly, the bomb will go off.
  *
- *TODO:
- * Game logic to check the sequence
- * Timing logic & clock display
  * 
  */
 #include <ButtonDebounce.h>
 #include <LiquidCrystal_I2C.h>
 #include <Adafruit_GFX.h>
-#include "Adafruit_LEDBackpack.h"
+#include <Adafruit_LEDBackpack.h>
+#include <TimerOne.h>
 
 // "Wire" Pins
 #define BLUE    2
@@ -45,16 +43,16 @@ const char* blank = "                 ";
 Adafruit_7segment matrix = Adafruit_7segment();
 
 // Timer
-//const int duration = 3000;    // ms
-int remaining = 10000;
-int start_ms;
+unsigned long interval = 1;       // seconds
+unsigned long remaining = 45;     // seconds
+int ledState = LOW;
 
 // Puzzle
 const int sequence[] = { ORANGE, BLUE, YELLOW };    // This is the correct removal sequence to defuse the bomb
 const int num_wires = 3;
 int next_to_cut = 0;                              // Which wire in the sequence should be cut next?
 
-void show_cut_wire(char* color) {
+void show_cut_wire(const char* color) {
   lcd.setCursor(1, 5);
   lcd.print(blank);
   lcd.setCursor(1, 5);  
@@ -103,17 +101,14 @@ void purple_cut(const int state) {
   }
 }
 
-void check_time() {
+void check_time(void) {
+  // "Heartbeat"
+  ledState = !ledState;
+  digitalWrite(LED_BUILTIN, ledState);
+  
+  // Count Down
   if (remaining > 0) {
-    int elapsed = millis() - start_ms;
-    remaining -= elapsed;
-    //lcd.setCursor(2,2);
-    //lcd.print(remaining);
-    matrix.print(remaining/1000);
-    matrix.writeDisplay();
-    if ( remaining <= 0 ) {
-      lcd.print("  BOOM!"); 
-    }
+    remaining -= interval;
   }
 }
 
@@ -122,6 +117,10 @@ void setup() {
   for (int p=2; p < 9; p++) {   // DEPENDS ON "WIRE" PINS BEING SEQUENTIALLY DEFINED ABOVE!
     pinMode(p, INPUT);
   }
+
+  // Timer1 'heartbeat'
+  pinMode(LED_BUILTIN, OUTPUT);
+    
   blue_wire.setCallback(blue_cut);
   red_wire.setCallback(red_cut);
   green_wire.setCallback(green_cut);
@@ -137,7 +136,9 @@ void setup() {
 
   matrix.begin(0x70);
 
-  start_ms = millis();
+  Timer1.initialize(interval*1000000);  // needs microseconds
+  Timer1.attachInterrupt(check_time);
+
 }
 
 void loop() {
@@ -148,6 +149,22 @@ void loop() {
   yellow_wire.update();
   orange_wire.update();
   purple_wire.update();
-  check_time();
-  delay(1000); // THIS IS BAD DESIGN...USE INTERRUPTS FOR TIMER?
+
+  // Convert seconds count to a displayable time
+  int display_min = remaining / 60;
+  int display_sec = remaining % 60;
+
+  // Write the displayable time to the 7-segment display
+  matrix.writeDigitNum(0, (display_min / 10) % 10);
+  matrix.writeDigitNum(1, display_min % 10);
+  matrix.drawColon(true);
+  matrix.writeDigitNum(3, (display_sec / 10) % 10);
+  matrix.writeDigitNum(4, display_sec % 10);
+  matrix.writeDisplay();
+  
+  if (remaining <= 0) {
+      lcd.setCursor(0,2);
+      lcd.print("  BOOM!"); 
+  }
+  delay(100);
 }
