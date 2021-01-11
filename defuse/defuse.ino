@@ -44,13 +44,17 @@ Adafruit_7segment matrix = Adafruit_7segment();
 
 // Timer
 unsigned long interval = 1;       // seconds
-unsigned long remaining = 45;     // seconds
+unsigned long remaining = 10;     // seconds
 int ledState = LOW;
 
 // Puzzle
-const int sequence[] = { ORANGE, BLUE, YELLOW };    // This is the correct removal sequence to defuse the bomb
-const int num_wires = 3;
-int next_to_cut = 0;                              // Which wire in the sequence should be cut next?
+const int correct_wires[] = { ORANGE, BLUE, YELLOW };       // This is the correct removal sequence to defuse the bomb
+const int num_correct = 3;
+const int other_wires[] = { RED, GREEN, BROWN, PURPLE };    // These wires do not cause bomb to go off, but each speeds up timer a bit more
+const int num_other = 4;
+int next_to_cut = 0;                                        // Which wire in the sequence should be cut next?
+bool boom = false;                                          // Should be bomb go off?
+bool active = true;                                         // Is the bomb still active?
 
 void show_cut_wire(const char* color) {
   lcd.setCursor(1, 5);
@@ -60,44 +64,74 @@ void show_cut_wire(const char* color) {
   lcd.print(" was cut!");
 }
 
+// Key logic for the puzzle.
+void check_cut_wire(const int wire) {
+  if ( wire != correct_wires[next_to_cut] ) {
+    // check if it was a boom or a speed up
+    for ( int w=0; w < num_other; w++ ) {
+      if ( wire == other_wires[w] ) {
+        // Speed up the clock a bit 
+        break;
+      }
+    }
+    // If you get here, we know a 'correct' wire was cut out of sequence...bomb will go off!
+    boom = true;
+  } else {
+    // They cut correct wire...
+    next_to_cut++;
+    if ( next_to_cut == num_correct ) {
+      // Bomb defused!
+      active = false;
+    }
+  }
+}
+
 void blue_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Blue");
+    check_cut_wire(BLUE);
   }
 }
 
 void red_cut(const int state) {
   if (state == LOW) {
-    show_cut_wire("Red");  }
+    show_cut_wire("Red");
+    check_cut_wire(RED);
+  }
 }
 
 void green_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Green");
+    check_cut_wire(GREEN);
   }
 }
 
 void brown_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Brown");
+    check_cut_wire(BROWN);
   }
 }
 
 void yellow_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Yellow");
+    check_cut_wire(YELLOW);
   }
 }
 
 void orange_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Orange");
+    check_cut_wire(ORANGE);
   }
 }
 
 void purple_cut(const int state) {
   if (state == LOW) {
     show_cut_wire("Purple");
+    check_cut_wire(PURPLE);
   }
 }
 
@@ -142,29 +176,38 @@ void setup() {
 }
 
 void loop() {
-  blue_wire.update();
-  red_wire.update();
-  green_wire.update();
-  brown_wire.update();
-  yellow_wire.update();
-  orange_wire.update();
-  purple_wire.update();
-
-  // Convert seconds count to a displayable time
-  int display_min = remaining / 60;
-  int display_sec = remaining % 60;
-
-  // Write the displayable time to the 7-segment display
-  matrix.writeDigitNum(0, (display_min / 10) % 10);
-  matrix.writeDigitNum(1, display_min % 10);
-  matrix.drawColon(true);
-  matrix.writeDigitNum(3, (display_sec / 10) % 10);
-  matrix.writeDigitNum(4, display_sec % 10);
-  matrix.writeDisplay();
-  
-  if (remaining <= 0) {
+  if ( active ) {
+    if ( !boom ) {
+      blue_wire.update();
+      red_wire.update();
+      green_wire.update();
+      brown_wire.update();
+      yellow_wire.update();
+      orange_wire.update();
+      purple_wire.update();
+    
+      // Convert seconds count to a displayable time
+      int display_min = remaining / 60;
+      int display_sec = remaining % 60;
+    
+      // Write the displayable time to the 7-segment display
+      matrix.writeDigitNum(0, (display_min / 10) % 10);
+      matrix.writeDigitNum(1, display_min % 10);
+      matrix.drawColon(true);
+      matrix.writeDigitNum(3, (display_sec / 10) % 10);
+      matrix.writeDigitNum(4, display_sec % 10);
+      matrix.writeDisplay();
+      
+      if (remaining <= 0) {
+        boom = true;
+      }
+    } else {
       lcd.setCursor(0,2);
       lcd.print("  BOOM!"); 
+    }
+  } else {
+      lcd.setCursor(0,2);
+      lcd.print("  DISARMED"); 
+
   }
-  delay(100);
 }
