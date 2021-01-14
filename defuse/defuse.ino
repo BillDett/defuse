@@ -43,11 +43,12 @@ const char* blank = "                 ";
 Adafruit_7segment matrix = Adafruit_7segment();
 
 // Timer
-unsigned long interval = 1;       // seconds
-unsigned long remaining = 10;     // seconds
+unsigned long interval = 250000;     // seconds between Timer hitting callback
+volatile unsigned int step = 4;      // how many intervals to wait across callbacks to decrement remaining (clock countdown rate)
 int ledState = LOW;
 
 // Puzzle
+volatile unsigned long remaining = 300;                     // seconds left until bomb goes off  (needs volatile since it's shared with interrupt)
 const int correct_wires[] = { ORANGE, BLUE, YELLOW };       // This is the correct removal sequence to defuse the bomb
 const int num_correct = 3;
 const int other_wires[] = { RED, GREEN, BROWN, PURPLE };    // These wires do not cause bomb to go off, but each speeds up timer a bit more
@@ -55,36 +56,6 @@ const int num_other = 4;
 int next_to_cut = 0;                                        // Which wire in the sequence should be cut next?
 bool boom = false;                                          // Should be bomb go off?
 bool active = true;                                         // Is the bomb still active?
-
-void show_cut_wire(const char* color) {
-  lcd.setCursor(1, 5);
-  lcd.print(blank);
-  lcd.setCursor(1, 5);  
-  lcd.print(color);
-  lcd.print(" was cut!");
-}
-
-// Key logic for the puzzle.
-void check_cut_wire(const int wire) {
-  if ( wire != correct_wires[next_to_cut] ) {
-    // check if it was a boom or a speed up
-    for ( int w=0; w < num_other; w++ ) {
-      if ( wire == other_wires[w] ) {
-        // Speed up the clock a bit 
-        break;
-      }
-    }
-    // If you get here, we know a 'correct' wire was cut out of sequence...bomb will go off!
-    boom = true;
-  } else {
-    // They cut correct wire...
-    next_to_cut++;
-    if ( next_to_cut == num_correct ) {
-      // Bomb defused!
-      active = false;
-    }
-  }
-}
 
 void blue_cut(const int state) {
   if (state == LOW) {
@@ -135,14 +106,55 @@ void purple_cut(const int state) {
   }
 }
 
+// TODO: Confirm this is working correctly- doesn't seem to speed up after last wire is pulled...
 void check_time(void) {
+  static int step_counter = 0;
+  
+  step_counter++;
+  
   // "Heartbeat"
   ledState = !ledState;
   digitalWrite(LED_BUILTIN, ledState);
-  
+                
   // Count Down
-  if (remaining > 0) {
-    remaining -= interval;
+  if (remaining > 0 && (step_counter >= step)) {  // Only decrease time when we're on a 'step'
+    remaining -= 1;
+    step_counter = 0;
+  }
+}
+
+void show_cut_wire(const char* color) {
+  lcd.setCursor(1, 5);
+  lcd.print(blank);
+  lcd.setCursor(1, 5);  
+  lcd.print(color);
+  lcd.print(" was cut!");
+}
+
+// Key logic for the puzzle.
+void check_cut_wire(const int wire) {
+  if ( wire != correct_wires[next_to_cut] ) {
+    // check if it was a boom or a speed up
+    for ( int w=0; w < num_other; w++ ) {
+      if ( wire == other_wires[w] ) {
+        // Speed up the clock a bit 
+        noInterrupts();
+        step -= 1;
+        interrupts();
+        return;
+      }
+    }
+    // If you get here, we know a 'correct' wire was cut out of sequence...bomb will go off!
+    boom = true;
+    return;
+  } else {
+    // They cut correct wire...
+    next_to_cut++;
+    if ( next_to_cut == num_correct ) {
+      // Bomb defused!
+      active = false;
+    }
+    return;
   }
 }
 
@@ -170,7 +182,7 @@ void setup() {
 
   matrix.begin(0x70);
 
-  Timer1.initialize(interval*1000000);  // needs microseconds
+  Timer1.initialize(interval);
   Timer1.attachInterrupt(check_time);
 
 }
@@ -185,10 +197,16 @@ void loop() {
       yellow_wire.update();
       orange_wire.update();
       purple_wire.update();
+
+      // Need to make a 'local' copy of remaining variable since it's updated by the interrupt
+      unsigned long local_remaining;
+      noInterrupts();
+      local_remaining = remaining;
+      interrupts();
     
       // Convert seconds count to a displayable time
-      int display_min = remaining / 60;
-      int display_sec = remaining % 60;
+      int display_min = local_remaining / 60;
+      int display_sec = local_remaining % 60;
     
       // Write the displayable time to the 7-segment display
       matrix.writeDigitNum(0, (display_min / 10) % 10);
@@ -197,8 +215,9 @@ void loop() {
       matrix.writeDigitNum(3, (display_sec / 10) % 10);
       matrix.writeDigitNum(4, display_sec % 10);
       matrix.writeDisplay();
-      
-      if (remaining <= 0) {
+
+      // Did we time out?
+      if (local_remaining <= 0) {
         boom = true;
       }
     } else {
@@ -208,6 +227,5 @@ void loop() {
   } else {
       lcd.setCursor(0,2);
       lcd.print("  DISARMED"); 
-
   }
 }
