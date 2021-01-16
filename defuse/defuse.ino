@@ -1,16 +1,14 @@
 /*
  * Defuse the Bomb!
  * 
- * "Cut" the specific colored wires in the correct sequence to stop the bomb from detonating!
+ * Goal: "Cut" the specific colored wires in the correct sequence to stop the bomb from detonating!
  * 
- * Cutting a wire outside the sequence speeds up the clock.
+ * Cutting a wire outside the correct sequence speeds up the clock.
  * 
- * If a wire within the sequence is cut out of order, the bomb will go off.
+ * If a wire within the correct sequence is cut out of order, or the time expires before the sequence is completed correctly,
+ *   the bomb will go off (BOOM pin goes HIGH).
  * 
  * If each wire in the sequence is cut in the correct order, the bomb is defused.
- * 
- * If the time expires before the sequence is completed correctly, the bomb will go off.
- *
  * 
  */
 #include <ButtonDebounce.h>
@@ -28,7 +26,9 @@
 #define ORANGE  7
 #define PURPLE  8
 
-#define BEEP    9
+#define BEEP    9     // Audible 'beep' for each clock tick
+
+#define BOOM    10    // Goes HIGH if Bomb has gone off
 
 ButtonDebounce blue_wire(BLUE, 250);
 ButtonDebounce red_wire(RED, 250);
@@ -47,6 +47,7 @@ Adafruit_7segment matrix = Adafruit_7segment();
 // Timer
 unsigned long interval = 250000;     // seconds between Timer hitting callback
 volatile unsigned int step = 4;      // how many intervals to wait across callbacks to decrement remaining (clock countdown rate)
+volatile int step_counter = 0;
 int ledState = LOW;
 
 // Puzzle
@@ -56,8 +57,8 @@ const int num_correct = 3;
 const int other_wires[] = { RED, GREEN, BROWN, PURPLE };    // These wires do not cause bomb to go off, but each speeds up timer a bit more
 const int num_other = 4;
 int next_to_cut = 0;                                        // Which wire in the sequence should be cut next?
-bool boom = false;                                          // Should be bomb go off?
-bool active = true;                                         // Is the bomb still active?
+volatile bool boom = false;                                          // Should be bomb go off?
+volatile bool active = true;                                         // Is the bomb still active?
 
 void blue_cut(const int state) {
   if (state == LOW) {
@@ -108,10 +109,8 @@ void purple_cut(const int state) {
   }
 }
 
-// TODO: Confirm this is working correctly- doesn't seem to speed up after last wire is pulled...
+// Called on each interval
 void check_time(void) {
-  static int step_counter = 0;
-  
   step_counter++;
   
   // "Heartbeat"
@@ -140,7 +139,7 @@ void show_cut_wire(const char* color) {
 // Key logic for the puzzle.
 void check_cut_wire(const int wire) {
   if ( wire != correct_wires[next_to_cut] ) {
-    // check if it was a boom or a speed up
+    // did we cut a wire that speeds up the clock?
     for ( int w=0; w < num_other; w++ ) {
       if ( wire == other_wires[w] ) {
         // Speed up the clock a bit 
@@ -170,8 +169,13 @@ void setup() {
     pinMode(p, INPUT);
   }
 
-  // Timer1 'heartbeat'
+  // Timer 'heartbeat'
   pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BEEP, OUTPUT);
+
+  // Trigger pin- goes high if bomb has gone off
+  pinMode(BOOM, OUTPUT);
+  digitalWrite(BOOM, LOW);
     
   blue_wire.setCallback(blue_cut);
   red_wire.setCallback(red_cut);
@@ -229,6 +233,7 @@ void loop() {
     } else {
       lcd.setCursor(0,2);
       lcd.print("  BOOM!"); 
+      digitalWrite(BOOM, HIGH);
     }
   } else {
       lcd.setCursor(0,2);
