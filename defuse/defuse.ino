@@ -28,6 +28,8 @@
 #define ORANGE  7
 #define PURPLE  8
 
+#define BEEP    9
+
 ButtonDebounce blue_wire(BLUE, 250);
 ButtonDebounce red_wire(RED, 250);
 ButtonDebounce green_wire(GREEN, 250);
@@ -115,11 +117,15 @@ void check_time(void) {
   // "Heartbeat"
   ledState = !ledState;
   digitalWrite(LED_BUILTIN, ledState);
+  digitalWrite(BEEP, LOW);    // beep is normally off, we only 'beep' when actually changing a number
                 
   // Count Down
-  if (remaining > 0 && (step_counter >= step)) {  // Only decrease time when we're on a 'step'
-    remaining -= 1;
-    step_counter = 0;
+  if (active && !boom) {
+    if (remaining > 0 && (step_counter >= step)) {  // Only decrease time when we're on a 'step'
+      remaining -= 1;
+      step_counter = 0;
+      digitalWrite(BEEP, HIGH);
+    }
   }
 }
 
