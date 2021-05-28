@@ -173,9 +173,9 @@ void setup() {
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BEEP, OUTPUT);
 
-  // Trigger pin- goes high if bomb has gone off
+  // Trigger pin- goes low if bomb has gone off
   pinMode(BOOM, OUTPUT);
-  digitalWrite(BOOM, LOW);
+  digitalWrite(BOOM, HIGH);
     
   blue_wire.setCallback(blue_cut);
   red_wire.setCallback(red_cut);
@@ -233,7 +233,7 @@ void loop() {
     } else {
       lcd.setCursor(0,2);
       lcd.print("  BOOM!"); 
-      digitalWrite(BOOM, HIGH);
+      digitalWrite(BOOM, LOW);
     }
   } else {
       lcd.setCursor(0,2);
